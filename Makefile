@@ -37,7 +37,8 @@ stage: compile $(OUT_DIR)/ap_placeholders.cfg
 	cp $(BUILD_DIR)/Newtonsoft.Json.dll              $(OUT_DIR)/
 	cp $(BUILD_DIR)/websocket-sharp.dll              $(OUT_DIR)/
 	cp lib/System.Numerics.dll                       $(OUT_DIR)/
-	cp lib/System.Runtime.Serialization.dll          $(OUT_DIR)/
+	cp lib/System.Runtime.Serialization.dll                                              $(OUT_DIR)/
+	cp "$(KSP_DIR)/KSPLauncher_Data/Managed/System.ServiceModel.Internals.dll"           $(OUT_DIR)/
 	cp assets/ap_icon.png  $(OUT_DIR)/
 	cp assets/Models/AP.mu $(OUT_DIR)/Models/
 
