@@ -56,6 +56,9 @@ namespace KSPArchipelago
         // Invoked when a location send throws (likely a closed socket the
         // library hasn't surfaced yet). Lets APConsole start its reconnect cycle.
         private Action<string> onSendFailed;
+        private Action<string> onNodeChecked;
+
+        public void SetNodeCheckedCallback(Action<string> cb) => onNodeChecked = cb;
 
         // Locations detected while offline, queued for sending on reconnect.
         // Shared reference with ApScenarioModule for save/load persistence.
@@ -857,7 +860,7 @@ namespace KSPArchipelago
                 ReportLocation($"{displayName} {slot}");
 
             // Clear placeholders before scouting re-evaluates newly purchasable nodes.
-            UnityEngine.Object.FindObjectOfType<TechTreeScout>()?.OnNodeChecked(nodeId);
+            onNodeChecked?.Invoke(nodeId);
         }
     }
 }

@@ -24,18 +24,21 @@ namespace KSPArchipelago
     {
         private float _lastWarnTime = -10f;
         private const float WarnIntervalSec = 1.5f;
+        private KSPArchipelagoMod _mod;
 
-        private static KSPArchipelagoMod GetMod() =>
-            FindObjectOfType<KSPArchipelagoMod>();
+        private void Start()
+        {
+            _mod = KSPArchipelagoMod.Instance;
+        }
 
         private void Update()
         {
+            if (_mod?.LaunchPadMassCaps == null) return;
             if (EditorLogic.fetch == null) return;
             var ship = EditorLogic.fetch.ship;
             if (ship == null || ship.parts == null || ship.parts.Count == 0) return;
 
-            var mod = GetMod();
-            if (mod?.LaunchPadMassCaps == null) return;
+            var mod = _mod;
 
             float cap = mod.CurrentLaunchPadMassCap;
             if (float.IsPositiveInfinity(cap)) return;
@@ -77,7 +80,7 @@ namespace KSPArchipelago
             if (vessel == null) return;
             if (vessel.situation != Vessel.Situations.PRELAUNCH) return;
 
-            var mod = FindObjectOfType<KSPArchipelagoMod>();
+            var mod = KSPArchipelagoMod.Instance;
             if (mod?.LaunchPadMassCaps == null) return;
 
             float cap = mod.CurrentLaunchPadMassCap;

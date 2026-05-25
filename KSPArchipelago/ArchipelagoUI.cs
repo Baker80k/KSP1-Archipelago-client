@@ -41,7 +41,7 @@ namespace KSPArchipelago
         private void Start()
         {
             instance = this;
-            mod = FindObjectOfType<KSPArchipelagoMod>();
+            mod = KSPArchipelagoMod.Instance;
 
             LoadConnectionSettings();
 

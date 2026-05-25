@@ -73,15 +73,22 @@ namespace KSPArchipelago
 
         private void Start()
         {
-            mod = FindObjectOfType<KSPArchipelagoMod>();
+            mod = KSPArchipelagoMod.Instance;
             if (mod != null)
+            {
                 mod.OnItemReceived += OnItemReceived;
+                mod.SetNodeCheckedCallback(OnNodeChecked);
+            }
         }
 
         private void OnDestroy()
         {
             if (mod != null)
+            {
                 mod.OnItemReceived -= OnItemReceived;
+                mod.SetNodeCheckedCallback(null);
+                mod = null;
+            }
         }
 
         private void Update()
@@ -270,7 +277,7 @@ namespace KSPArchipelago
 
                     ScoutedItemInfo info = kvp.Value;
                     string itemName = info.ItemName ?? info.ItemDisplayName ?? $"Item #{info.ItemId}";
-                    bool isKspPart = PartLoader.getPartInfoByName(itemName) != null;
+                    bool isKspPart = KSPArchipelagoPartsManager.GetPart(itemName) != null;
 
                     var slot = new ScoutedSlot
                     {

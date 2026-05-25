@@ -31,11 +31,11 @@ namespace KSPArchipelago
             if (eventType == ConstructionEventType.PartCreated
                 || eventType == ConstructionEventType.PartAttached)
             {
-                var mod = FindObjectOfType<KSPArchipelagoMod>();
+                var mod = KSPArchipelagoMod.Instance;
                 string progName = mod?.GetPartProgressiveName(realPartName) ?? "???";
                 int reqTier = mod?.GetPartRequiredTier(realPartName) ?? 0;
 
-                AvailablePart realPart = PartLoader.getPartInfoByName(realPartName);
+                AvailablePart realPart = KSPArchipelagoPartsManager.GetPart(realPartName);
                 string title = realPart?.title ?? realPartName;
 
                 if (part.parent != null)

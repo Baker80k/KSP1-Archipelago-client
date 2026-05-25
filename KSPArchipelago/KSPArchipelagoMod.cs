@@ -26,6 +26,25 @@ namespace KSPArchipelago
         // Populated from slot_data at connect time.
         private static Dictionary<string, float> SciencePackAmounts = new Dictionary<string, float>();
 
+        // Built once on first use. PartLoader.getPartInfoByName is an O(N) linear
+        // scan; this turns every lookup into O(1).
+        private static Dictionary<string, AvailablePart> _partByName;
+
+        internal static AvailablePart GetPart(string name)
+        {
+            if (_partByName == null)
+            {
+                var list = PartLoader.LoadedPartsList;
+                _partByName = new Dictionary<string, AvailablePart>(list.Count);
+                foreach (var p in list)
+                    if (p?.name != null) _partByName[p.name] = p;
+                Debug.Log($"[KSP-AP] Part cache built: {_partByName.Count} parts");
+            }
+            if (name == null) return null;
+            _partByName.TryGetValue(name, out var part);
+            return part;
+        }
+
         /// <summary>
         /// Parse science pack definitions from slot_data. Returns true on success.
         /// </summary>
@@ -74,7 +93,7 @@ namespace KSPArchipelago
                 return;
             }
 
-            var mod = UnityEngine.Object.FindObjectOfType<KSPArchipelagoMod>();
+            var mod = KSPArchipelagoMod.Instance;
 
             // Progressive Launch Pad: raise the buildable launch-mass cap.
             if (itemName == "Progressive Launch Pad")
@@ -117,7 +136,6 @@ namespace KSPArchipelago
                 if (showToast)
                 {
                     toastText = $"AP: {itemName} Tier {newLevel} ({unlocked} parts unlocked)";
-                    Debug.Log($"[KSP-AP] {itemName} → tier {newLevel}, {unlocked} parts");
                     ScreenMessages.PostScreenMessage(toastText, 4f, ScreenMessageStyle.UPPER_CENTER);
                     PostToMessageSystem(senderName, locationName, toastText);
                 }
@@ -126,21 +144,16 @@ namespace KSPArchipelago
 
             // Individual part items: unlock only if the progressive tier gate
             // is satisfied (or if the part is not in any progressive chain).
-            AvailablePart part = PartLoader.getPartInfoByName(itemName);
+            AvailablePart part = GetPart(itemName);
             if (part != null)
             {
                 if (mod != null) mod.TrackReceivedPart(itemName);
 
                 if (mod != null && mod.IsPartTierLocked(itemName))
                 {
-                    // Show an AP-icon placeholder in the editor instead of the
-                    // real part. EditorTierLock blocks placement attempts.
                     string progName = mod.GetPartProgressiveName(itemName);
                     int reqTier = mod.GetPartRequiredTier(itemName);
                     AllocateTierLockPlaceholder(itemName, part, progName, reqTier);
-
-                    Debug.Log($"[KSP-AP] Tier-locked part '{itemName}' ({part.title}) "
-                            + $"placeholder in editor, requires {progName} Tier {reqTier}");
                     if (showToast)
                     {
                         toastText = $"AP: {part.title} (tier locked)";
@@ -151,7 +164,6 @@ namespace KSPArchipelago
                 else
                 {
                     ResearchAndDevelopment.AddExperimentalPart(part);
-                    Debug.Log($"[KSP-AP] Unlocked part '{itemName}' ({part.title})");
                     if (showToast)
                     {
                         toastText = $"AP: Unlocked {part.title}";
@@ -207,7 +219,7 @@ namespace KSPArchipelago
             }
 
             string phName = $"ap.placeholder.{idx:D3}";
-            AvailablePart ph = PartLoader.getPartInfoByName(phName);
+            AvailablePart ph = GetPart(phName);
             if (ph == null)
             {
                 Debug.LogWarning($"[KSP-AP] Placeholder '{phName}' not found in PartLoader");
@@ -229,7 +241,7 @@ namespace KSPArchipelago
             if (!_tierLockReverse.TryGetValue(realPartName, out string phName))
                 return;
 
-            AvailablePart ph = PartLoader.getPartInfoByName(phName);
+            AvailablePart ph = GetPart(phName);
             if (ph != null)
             {
                 ResearchAndDevelopment.RemoveExperimentalPart(ph);
@@ -245,7 +257,6 @@ namespace KSPArchipelago
 
             _tierLockedParts.Remove(phName);
             _tierLockReverse.Remove(realPartName);
-            Debug.Log($"[KSP-AP] Tier-lock cleared for '{realPartName}' (freed {phName})");
         }
 
         /// <summary>
@@ -270,7 +281,7 @@ namespace KSPArchipelago
             // Reset placeholder titles/descriptions and free indices.
             foreach (var kvp in _tierLockedParts)
             {
-                AvailablePart ph = PartLoader.getPartInfoByName(kvp.Key);
+                AvailablePart ph = GetPart(kvp.Key);
                 if (ph != null)
                 {
                     ph.title = "AP Item";
@@ -323,6 +334,8 @@ namespace KSPArchipelago
     [KSPAddon(KSPAddon.Startup.Instantly, true)]
     public class KSPArchipelagoMod : MonoBehaviour
     {
+        public static KSPArchipelagoMod Instance { get; private set; }
+
         private readonly object sessionLock = new object();
         private ArchipelagoSession session;
         private MissionTracker missionTracker;
@@ -413,7 +426,6 @@ namespace KSPArchipelago
         public void IncrementRDLevel()
         {
             RDLevel++;
-            Debug.Log($"[KSP-AP] R&D level incremented to {RDLevel}");
         }
 
         public int IncrementProgressiveCount(string itemName)
@@ -446,7 +458,7 @@ namespace KSPArchipelago
             // Unlock the representative.
             if (chosen != null)
             {
-                AvailablePart chosenPart = PartLoader.getPartInfoByName(chosen);
+                AvailablePart chosenPart = KSPArchipelagoPartsManager.GetPart(chosen);
                 if (chosenPart != null)
                 {
                     ResearchAndDevelopment.AddExperimentalPart(chosenPart);
@@ -459,17 +471,12 @@ namespace KSPArchipelago
             foreach (string p in partNames)
             {
                 if (p == chosen) continue;
-                if (PartLoader.getPartInfoByName(p) == null) continue;
-                if (_receivedParts.Contains(p))
-                {
-                    AvailablePart ap = PartLoader.getPartInfoByName(p);
-                    if (ap != null)
-                    {
-                        ResearchAndDevelopment.AddExperimentalPart(ap);
-                        KSPArchipelagoPartsManager.RestoreTierLockOverrides(p, ap);
-                        unlocked++;
-                    }
-                }
+                if (!_receivedParts.Contains(p)) continue;
+                AvailablePart ap = KSPArchipelagoPartsManager.GetPart(p);
+                if (ap == null) continue;
+                ResearchAndDevelopment.AddExperimentalPart(ap);
+                KSPArchipelagoPartsManager.RestoreTierLockOverrides(p, ap);
+                unlocked++;
             }
             return unlocked;
         }
@@ -504,6 +511,8 @@ namespace KSPArchipelago
         // Internal notification callback for UI.
         public event Action<string> OnItemReceived;
 
+        public void SetNodeCheckedCallback(Action<string> cb) => missionTracker?.SetNodeCheckedCallback(cb);
+
         // Deferred reset: HandleConnect runs on a background thread but
         // item processing calls Unity APIs that must run on the main thread.
         // This flag tells Update() to do a full rebuild before processing.
@@ -511,6 +520,11 @@ namespace KSPArchipelago
 
         // Track the last processed index for fast incremental polling.
         private int _lastProcessedIndex = 0;
+
+        private void Awake()
+        {
+            Instance = this;
+        }
 
         private void Start()
         {
@@ -642,7 +656,9 @@ namespace KSPArchipelago
         }
 
         /// <summary>
-        /// Fast incremental path: check for new items beyond what we've already processed.
+        /// Fast incremental path: process one new item per Update() frame.
+        /// Spreading across frames prevents multi-item batches (e.g. all slots in a
+        /// researched tech node) from spiking a single frame.
         /// </summary>
         private void ProcessNewItems()
         {
@@ -650,25 +666,22 @@ namespace KSPArchipelago
 
             var allItems = session.Items.AllItemsReceived;
             var awarded = ApScenarioModule.Instance?.AwardedItemIndices;
-            int count = allItems.Count;
 
-            if (count <= _lastProcessedIndex) return;
+            if (allItems.Count <= _lastProcessedIndex) return;
 
-            for (int i = _lastProcessedIndex; i < count; i++)
+            var item = allItems[_lastProcessedIndex];
+            if (item.ItemName != null)
             {
-                var item = allItems[i];
-                if (item.ItemName == null) continue;
-
                 KSPArchipelagoPartsManager.GiveItem(
                     item.ItemName, item.Player?.Alias, item.LocationName,
                     showToast: true, awardScience: true);
 
-                awarded?.Add(i);
+                awarded?.Add(_lastProcessedIndex);
                 ItemsReceivedCount++;
                 OnItemReceived?.Invoke(item.ItemName);
             }
 
-            _lastProcessedIndex = count;
+            _lastProcessedIndex++;
         }
 
         // Deferred error: set on background thread, shown by Update() on main thread.
@@ -849,6 +862,7 @@ namespace KSPArchipelago
 
         public void OnDestroy()
         {
+            Instance = null;
             GameEvents.onGameStateLoad.Remove(new EventData<ConfigNode>.OnEvent(OnGameStateLoad));
             GameEvents.onGameSceneLoadRequested.Remove(OnSceneChange);
             missionTracker?.Destroy();

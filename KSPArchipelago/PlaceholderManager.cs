@@ -53,7 +53,7 @@ namespace KSPArchipelago
             for (int i = 1; ; i++)
             {
                 string name = $"{PlaceholderPrefix}{i:D3}";
-                AvailablePart ap = PartLoader.getPartInfoByName(name);
+                AvailablePart ap = KSPArchipelagoPartsManager.GetPart(name);
                 if (ap == null) break;
                 pool.Add(ap);
             }
@@ -219,13 +219,13 @@ namespace KSPArchipelago
 
                     if (scouted.IsForSelf && scouted.IsKspPart)
                     {
-                        AvailablePart realPart = PartLoader.getPartInfoByName(scouted.ItemName);
+                        AvailablePart realPart = KSPArchipelagoPartsManager.GetPart(scouted.ItemName);
                         if (realPart != null)
                         {
                             // Check if this part would be tier-locked. If so, keep the
                             // placeholder and annotate it rather than swapping in the
                             // real part (which has no lock indication).
-                            var mod = UnityEngine.Object.FindObjectOfType<KSPArchipelagoMod>();
+                            var mod = KSPArchipelagoMod.Instance;
                             if (mod != null && mod.IsPartTierLocked(scouted.ItemName))
                             {
                                 string progName = mod.GetPartProgressiveName(scouted.ItemName);
